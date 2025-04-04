@@ -1,0 +1,45 @@
+
+BICQ-PT Game Changer Dashboard - Program Overview
+--------------------------------------------------
+
+Overview:
+This Streamlit-based dashboard is designed for students using the BICQ (Behavior-Inspired Cognitive Quotient) Method, integrating Game Changer challenges and the Neuro-Spaced Mastery (NSM) approach. It tracks academic growth, motivation, and improvement over time.
+
+Key Features:
+1. Student Login System
+2. PQ and RMQ Progress Tracking
+3. Motivational Messaging (AI-generated)
+4. Game Changer: Weekend Challenges based on Weak Areas
+5. Star-based Reward System
+6. Weekly History Table (PQ, RMQ, Stars, GPA)
+7. Visual Progress Graphs
+8. AI-based Correlation & Growth Advice
+
+Sections:
+1. Snapshot View
+   - PQ (Performance Quotient) Score
+   - RMQ (Reverse Measurement Quotient) Score
+   - Stars Earned
+2. Game Changer Generator
+   - 5 randomized weekend questions from weak subject areas
+   - Stars earned for completion
+3. Growth Analysis
+   - History of performance each week
+   - Line graphs for PQ/RMQ and GPA
+   - AI-powered insights based on correlation analysis
+
+Tech Stack:
+- Streamlit for frontend dashboard
+- Python (random, pandas, matplotlib)
+- Future Ready: Can be expanded with student database, NSM flow, and real-time question scoring
+
+Ideal Users:
+- Students in grades 3–12
+- Tutors and teachers guiding struggling learners
+- Educational AI developers integrating mastery learning
+
+Instructions:
+1. Run the app locally with Streamlit:
+   `streamlit run app.py`
+2. Or upload to GitHub and deploy via Streamlit Cloud
+
