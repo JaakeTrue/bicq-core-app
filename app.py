@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import datetime
@@ -17,7 +16,7 @@ def login():
         else:
             st.error("Invalid credentials")
 
-# --- Dashboard Layout ---
+# --- Main Dashboard ---
 def dashboard():
     st.title("BICQ-PT Growth Dashboard")
 
@@ -73,7 +72,7 @@ def dashboard():
             csv = df.to_csv(index=False).encode('utf-8')
             st.download_button("Download My Data (CSV)", csv, "bicq_data.csv", "text/csv")
 
-# --- Main App Logic ---
+# --- Main Logic ---
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
