@@ -124,4 +124,3 @@ if "logged_in" not in st.session_state:
 if st.session_state["logged_in"]:
     dashboard()
 else:
-    login()PASTE FINAL STREAMLIT CODE HERE FROM CANVAS]
