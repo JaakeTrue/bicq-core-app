@@ -1,4 +1,4 @@
-[import streamlit as st
+import streamlit as st
 import pandas as pd
 import datetime
 import matplotlib.pyplot as plt
@@ -124,3 +124,4 @@ if "logged_in" not in st.session_state:
 if st.session_state["logged_in"]:
     dashboard()
 else:
+    login()
