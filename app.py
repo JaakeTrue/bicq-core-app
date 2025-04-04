@@ -52,7 +52,7 @@ def draw_radar(student_data, traits):
     angles += angles[:1]
 
     for idx, row in enumerate(student_data.itertuples()):
-        values = [getattr(row, trait) for trait in traits] + [getattr(row, traits[0])]
+        values = [row._asdict()[trait] for trait in traits] + [row._asdict()[traits[0]]]
         ax.plot(angles, values, linewidth=2, label=f"{row.Date}", color=colors[idx])
         ax.fill(angles, values, alpha=0.1, color=colors[idx])
 
