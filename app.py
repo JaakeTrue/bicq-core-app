@@ -9,213 +9,212 @@ import numpy as np
 from datetime import datetime
 
 # --- Constants ---
-DIAGNOSTIC_FILES = {
-    "Grade 1": "grade1_diagnostic.json",
-    "Grade 2": "grade2_diagnostic.json",
-    "Grade 3": "grade3_diagnostic.json",
-    "Grade 4": "grade4_diagnostic.json",
-    "Grade 5": "grade5_diagnostic.json",
-    "Grade 6": "grade6_diagnostic.json",
-    "Grade 7": "grade7_diagnostic.json",
-    "Grade 8": "grade8_diagnostic.json",
-    "GED": "ged_diagnostic.json"
-}
-DIAGNOSTIC_PATH = "diagnostics"
+WORKSHEET_FOLDER = "3rd_English_Worksheets"
 STUDENT_LIST = ["Select Student", "Izzy", "Jayden", "Maria", "Jake", "Masaki"]
 
+# --- Worksheet Structure ---
+WORKSHEET_CATEGORIES = {
+    "Grammar": {
+        "Pronouns": ["Subject Pronouns", "Pronoun Replacement"],
+        "Verbs": ["Present Tense", "Present Progressive", "Do/Does/Did"],
+        "Nouns": ["Common/Proper Nouns", "There is/There are"],
+        "Prepositions": ["Preposition Practice"]
+    },
+    "Reading": {
+        "Grasshopper Story": ["Reading Passage", "Comprehension Questions", "Cloze Activity"],
+        "Three Rs Story": ["Reading Passage", "Vocabulary Exercise", "True/False Questions"]
+    },
+    "Writing": {
+        "Capitalization": ["Sentence Correction", "Paragraph Correction"],
+        "Alphabetical Order": ["ABC Practice"]
+    },
+    "Vocabulary": {
+        "General": ["Number Words Matching"]
+    }
+}
+
+# Sample questions database
+SAMPLE_QUESTIONS = {
+    "Subject Pronouns": [
+        {
+            "question": "_____ am a student. (I/She/They)",
+            "answer": "I",
+            "difficulty": "Easy"
+        },
+        {
+            "question": "_____ are family. (Mark and Daniel)",
+            "answer": "They",
+            "difficulty": "Medium"
+        }
+    ],
+    "Pronoun Replacement": [
+        {
+            "question": "Charles puts the books on the table. → _____ puts the books on the table.",
+            "options": ["It", "Me", "Us", "He"],
+            "answer": "He",
+            "difficulty": "Easy"
+        }
+    ]
+}
+
 # --- Utility Functions ---
-def initialize_session_state():
-    if "pq_scores" not in st.session_state:
-        st.session_state.pq_scores = {
-            "Participation": 5, 
-            "Effort": 5, 
-            "Mindset": 5, 
-            "Growth": 5, 
-            "Focus": 5
-        }
-    if "diagnostic_data" not in st.session_state:
-        st.session_state.diagnostic_data = {
-            "questions": [],
-            "index": 0,
-            "answers": [],
-            "reinforcement_mode": False,
-            "reinforcement_questions": [],
-            "reinforcement_index": 0,
-            "reinforcement_results": defaultdict(list),
-            "secret_gift_given": False,
-            "mastered_topics": set(),
-            "weak_areas": []
-        }
-
-def draw_radar(trait_scores, label="Today"):
-    traits = list(trait_scores.keys())
-    values = list(trait_scores.values()) + [trait_scores[traits[0]]]
-    angles = np.linspace(0, 2 * np.pi, len(traits), endpoint=False).tolist() + [0]
-
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-    ax.plot(angles, values, linewidth=2, linestyle='solid', label=label)
-    ax.fill(angles, values, alpha=0.25)
-    ax.set_yticklabels([])
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(traits)
-    ax.legend(loc='upper right')
-    st.pyplot(fig)
-
-def draw_spiral_placeholder():
-    t = np.linspace(0, 6 * np.pi, 100)
-    r = 0.5 * t
-    x = r * np.cos(t)
-    y = r * np.sin(t)
-    fig, ax = plt.subplots()
-    ax.plot(x, y)
-    ax.set_title("Spiral Growth Placeholder")
-    st.pyplot(fig)
-
-def load_diagnostic_questions(grade):
-    filename = DIAGNOSTIC_FILES[grade]
-    filepath = os.path.join(DIAGNOSTIC_PATH, filename)
+def load_worksheet(category, subcategory, worksheet):
+    """Load worksheet questions from JSON files"""
+    filepath = os.path.join(WORKSHEET_FOLDER, category, subcategory, f"{worksheet.replace(' ', '_')}.json")
     
     try:
         if os.path.exists(filepath):
-            with open(filepath, "r", encoding="utf-8") as f:
+            with open(filepath, 'r', encoding='utf-8') as f:
                 return json.load(f)
         else:
-            st.warning(f"{filename} not found. Using sample questions.")
-            return [{
-                "subject": "Math",
-                "topic": "Sample",
-                "difficulty": "Easy",
-                "question": "What is 2 + 2?",
-                "answer": "4"
-            }]
+            st.warning(f"Worksheet not found: {worksheet}")
+            return SAMPLE_QUESTIONS.get(worksheet, [])
     except Exception as e:
-        st.error(f"Error loading questions: {str(e)}")
+        st.error(f"Error loading worksheet: {str(e)}")
         return []
 
+def display_question(question, index, total):
+    """Render question with appropriate input type"""
+    st.subheader(f"Question {index + 1} of {total}")
+    
+    if 'options' in question:
+        answer = st.radio(question["question"], 
+                         question["options"],
+                         key=f"q_{index}")
+    else:
+        st.write(question["question"])
+        answer = st.text_input("Your answer:", key=f"q_{index}")
+    
+    return answer
+
 # --- UI Setup ---
-st.set_page_config(page_title="Game Changer Diagnostic", layout="wide")
-st.title("🧠 Game Changer Diagnostic System")
+st.set_page_config(page_title="3rd Grade English Learning System", layout="wide")
+st.title("📚 3rd Grade English Learning System")
 
 # --- Sidebar - Student Selection ---
 with st.sidebar:
-    st.header("👤 Student Login")
-    selected_student = st.selectbox("Choose a student:", STUDENT_LIST)
-    student_grade = st.selectbox("Grade:", list(DIAGNOSTIC_FILES.keys()))
-    login_date = datetime.today().strftime("%Y-%m-%d")
-    st.write(f"📅 Session: {login_date}")
-
-# Initialize session state
-initialize_session_state()
-
-# --- Main App Flow ---
-if selected_student == "Select Student":
-    st.info("👈 Please select a student from the sidebar to begin")
-else:
-    # --- Student Dashboard Header ---
-    st.header(f"Student Dashboard: {selected_student}")
-    st.subheader(f"📊 {student_grade} Performance Metrics")
-
-    # --- PQ Trait Assessment ---
-    st.subheader("🔧 PQ Trait Self-Check")
-    for trait in st.session_state.pq_scores:
-        st.session_state.pq_scores[trait] = st.slider(
-            trait, 1, 10, st.session_state.pq_scores[trait]
-        )
-
-    # --- Visualization Section ---
-    col1, col2 = st.columns(2)
-    with col1:
-        with st.expander("📊 PQ Trait Radar Chart"):
-            draw_radar(st.session_state.pq_scores)
-    with col2:
-        with st.expander("🌀 Spiral Growth View"):
-            draw_spiral_placeholder()
-
-    # --- Diagnostic Test Flow ---
-    data = st.session_state.diagnostic_data
+    st.header("👤 Student Profile")
+    selected_student = st.selectbox("Select Student:", STUDENT_LIST)
     
-    if not data["questions"] and not data["reinforcement_mode"]:
-        if st.button("Start Diagnostic Test"):
-            data["questions"] = load_diagnostic_questions(student_grade)
-            data["index"] = 0
-            data["answers"] = []
-
-    if data["questions"] and not data["reinforcement_mode"]:
-        if data["index"] < len(data["questions"]):
-            q = data["questions"][data["index"]]
-            st.subheader(f"Question {data['index'] + 1} of {len(data['questions'])}")
-            st.write(f"**Subject:** {q['subject']}")
-            st.write(f"**Topic:** {q['topic']} ({q['difficulty']})")
-            st.write(q['question'])
-            answer = st.text_input("Your Answer:", key=f"answer_{data['index']}")
-
-            if st.button("Next Question"):
-                data["answers"].append({
-                    "question": q['question'],
-                    "answer": answer,
-                    "subject": q['subject'],
-                    "topic": q['topic'],
-                    "correct": None
-                })
-                data["index"] += 1
-        else:
-            st.success("🎉 Diagnostic complete!")
-            df = pd.DataFrame(data["answers"])
-            st.dataframe(df)
-
-            data["weak_areas"] = df["topic"].value_counts().tail(5).index.tolist()
-            st.subheader("🧩 Recommended Reinforcement Topics")
-            for topic in data["weak_areas"]:
-                st.write(f"- {topic}")
-
-            if st.button("Start Reinforcement Phase"):
-                pool = [q for q in data["questions"] if q['topic'] in data["weak_areas"]]
-                data["reinforcement_questions"] = random.sample(pool, min(15, len(pool)))
-                data["reinforcement_mode"] = True
-                data["reinforcement_index"] = 0
-                data["reinforcement_results"] = defaultdict(list)
-                data["mastered_topics"] = set()
-
-    # --- Reinforcement Phase ---
-    if data["reinforcement_mode"]:
-        if data["reinforcement_index"] < len(data["reinforcement_questions"]):
-            rq = data["reinforcement_questions"][data["reinforcement_index"]]
-            st.subheader(f"🔁 Reinforcement Question {data['reinforcement_index'] + 1} of {len(data['reinforcement_questions'])}")
-            st.write(f"**Subject:** {rq['subject']}")
-            st.write(f"**Topic:** {rq['topic']} ({rq['difficulty']})")
-            st.write(rq['question'])
-            r_answer = st.text_input("Your Answer:", key=f"reinforce_{data['reinforcement_index']}")
-
-            if st.button("Next Reinforcement"):
-                topic = rq['topic']
-                correct = random.choice([True, False])
-                data["reinforcement_results"][topic].append(correct)
-
-                if data["reinforcement_results"][topic].count(True) == 4 and not data["secret_gift_given"]:
-                    data["secret_gift_given"] = True
-                    st.session_state.pq_scores["Growth"] += 0.5
-
-                total = len(data["reinforcement_results"][topic])
-                corrects = data["reinforcement_results"][topic].count(True)
-                if total >= 10 and corrects / total >= 0.8:
-                    data["mastered_topics"].add(topic)
-
-                data["reinforcement_index"] += 1
-        else:
-            st.balloons()
-            st.success("🌟 Reinforcement Complete!")
+    if selected_student != "Select Student":
+        st.subheader("📝 Worksheet Categories")
+        selected_category = st.selectbox("Category:", list(WORKSHEET_CATEGORIES.keys()))
+        
+        if selected_category:
+            selected_subcategory = st.selectbox("Subcategory:", 
+                                              list(WORKSHEET_CATEGORIES[selected_category].keys()))
             
-            if data["mastered_topics"]:
-                st.subheader("✅ Topics Mastered:")
-                for t in data["mastered_topics"]:
-                    st.write(f"- {t}")
+            if selected_subcategory:
+                selected_worksheet = st.selectbox("Worksheet:", 
+                                                 WORKSHEET_CATEGORIES[selected_category][selected_subcategory])
 
-            if data["secret_gift_given"]:
-                st.markdown("## 🎁 Secret Gift Unlocked!")
-                st.image("https://cdn-icons-png.flaticon.com/512/471/471664.png", width=150)
-                st.success("You've shown significant improvement!")
-                st.info("📬 Teacher Notification:")
-                st.write(f"Student {selected_student} has made excellent progress.")
-                st.write("Spiral score shifted +5% upward in 'Growth'.")
-            else:
-                st.info("Keep going! You're building confidence and power through effort ✨")
+# --- Main Content ---
+if selected_student == "Select Student":
+    st.info("👈 Please select a student to begin")
+else:
+    st.header(f"{selected_student}'s English Practice")
+    
+    # Initialize session state
+    if "worksheet_data" not in st.session_state:
+        st.session_state.worksheet_data = {
+            "questions": [],
+            "current_index": 0,
+            "answers": [],
+            "score": 0
+        }
+    
+    # Load selected worksheet
+    if st.button("📂 Load Worksheet"):
+        st.session_state.worksheet_data["questions"] = load_worksheet(
+            selected_category, 
+            selected_subcategory, 
+            selected_worksheet
+        )
+        st.session_state.worksheet_data["current_index"] = 0
+        st.session_state.worksheet_data["answers"] = []
+        st.session_state.worksheet_data["score"] = 0
+        st.success(f"Loaded {selected_worksheet} worksheet!")
+    
+    # Display current question
+    data = st.session_state.worksheet_data
+    if data["questions"]:
+        if data["current_index"] < len(data["questions"]):
+            q = data["questions"][data["current_index"]]
+            user_answer = display_question(q, data["current_index"], len(data["questions"]))
+            
+            if st.button("✅ Submit Answer"):
+                is_correct = False
+                if 'options' in q:
+                    is_correct = user_answer == q["answer"]
+                else:
+                    # Simple text answer checking (could be enhanced)
+                    is_correct = user_answer.lower().strip() == q["answer"].lower().strip()
+                
+                data["answers"].append({
+                    "question": q["question"],
+                    "user_answer": user_answer,
+                    "correct_answer": q["answer"],
+                    "is_correct": is_correct
+                })
+                
+                if is_correct:
+                    data["score"] += 1
+                    st.success("Correct! 🎉")
+                else:
+                    st.error(f"Oops! The correct answer is: {q['answer']}")
+                
+                if 'explanation' in q:
+                    st.info(f"Explanation: {q['explanation']}")
+                
+                data["current_index"] += 1
+                st.experimental_rerun()
+        else:
+            # Show results
+            st.balloons()
+            st.success(f"Worksheet complete! Score: {data['score']}/{len(data['questions'])}")
+            
+            # Display all questions and answers
+            st.subheader("📝 Your Answers")
+            for i, answer in enumerate(data["answers"]):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"Q{i+1}: {answer['question']}")
+                    st.write(f"Your answer: {answer['user_answer']}")
+                    st.write(f"Correct answer: {answer['correct_answer']}")
+                with col2:
+                    st.write("✅ Correct" if answer["is_correct"] else "❌ Incorrect")
+            
+            # Progress visualization
+            st.subheader("📊 Performance")
+            fig, ax = plt.subplots()
+            ax.bar(["Correct", "Incorrect"], 
+                  [data["score"], len(data["questions"]) - data["score"]],
+                  color=["green", "red"])
+            st.pyplot(fig)
+            
+            if st.button("🔄 Start New Worksheet"):
+                st.session_state.worksheet_data = {
+                    "questions": [],
+                    "current_index": 0,
+                    "answers": [],
+                    "score": 0
+                }
+                st.experimental_rerun()
+    else:
+        st.info("👉 Select a worksheet category and click 'Load Worksheet' to begin")
+
+# --- Instructions for Teachers ---
+with st.expander("ℹ️ Teacher Instructions"):
+    st.write("""
+    **How to use this system:**
+    1. Select a student from the sidebar
+    2. Choose a worksheet category and specific worksheet
+    3. Click 'Load Worksheet'
+    4. Students answer questions one by one
+    5. View results and explanations after completion
+    
+    **Adding New Worksheets:**
+    - Create JSON files in the `3rd_English_Worksheets` folder
+    - Follow the same structure as the sample questions
+    - Organize by category/subcategory
+    """)
