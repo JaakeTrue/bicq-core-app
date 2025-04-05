@@ -1,5 +1,5 @@
 
-# app.py (Merged Game Changer + Radar Spiral Dashboard)
+# app.py (Full Version: Login + PQ + Radar + Spiral + Game Changer)
 
 import os
 import json
@@ -9,6 +9,7 @@ import random
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
+from datetime import datetime
 
 # --- Load Grade-Level Diagnostic Sets ---
 diagnostic_files = {
@@ -29,8 +30,7 @@ diagnostic_path = "diagnostics"
 def draw_radar(trait_scores, label="Today"):
     traits = list(trait_scores.keys())
     values = list(trait_scores.values())
-    values += values[:1]  # repeat first value to close the circle
-    
+    values += values[:1]
     angles = np.linspace(0, 2 * np.pi, len(traits), endpoint=False).tolist()
     angles += angles[:1]
 
@@ -43,11 +43,32 @@ def draw_radar(trait_scores, label="Today"):
     ax.legend(loc='upper right')
     st.pyplot(fig)
 
+# --- Spiral Chart Placeholder ---
+def draw_spiral_placeholder():
+    t = np.linspace(0, 6 * np.pi, 100)
+    r = 0.5 * t
+    x = r * np.cos(t)
+    y = r * np.sin(t)
+    fig, ax = plt.subplots()
+    ax.plot(x, y)
+    ax.set_title("Spiral Growth Placeholder")
+    st.pyplot(fig)
+
 # --- App Layout ---
 st.set_page_config(page_title="Game Changer Diagnostic", layout="wide")
-st.title("🧠 Game Changer Diagnostic Test + Growth Radar")
+st.title("🧠 Game Changer Diagnostic System")
 
-# --- Initialize State ---
+# --- Login Panel ---
+with st.sidebar:
+    st.header("👤 Student Login")
+    student_name = st.text_input("Student Name:")
+    student_grade = st.selectbox("Grade:", list(diagnostic_files.keys()))
+    login_date = datetime.today().strftime("%Y-%m-%d")
+    st.write(f"📅 Session: {login_date}")
+
+# --- Init State ---
+if "pq_scores" not in st.session_state:
+    st.session_state.pq_scores = {"Participation": 5, "Effort": 5, "Mindset": 5, "Growth": 5, "Focus": 5}
 if "diagnostic_questions" not in st.session_state:
     st.session_state.diagnostic_questions = []
     st.session_state.diagnostic_index = 0
@@ -58,18 +79,24 @@ if "diagnostic_questions" not in st.session_state:
     st.session_state.reinforcement_results = defaultdict(list)
     st.session_state.secret_gift_given = False
     st.session_state.mastered_topics = set()
-    st.session_state.pq_scores = {"Participation": 5, "Effort": 5, "Mindset": 5, "Growth": 5, "Focus": 5}
 
-# --- PQ Trait Growth Chart ---
-with st.expander("📊 View PQ Trait Radar Chart"):
+# --- PQ Sliders ---
+st.subheader("🔧 PQ Trait Self-Check")
+for trait in st.session_state.pq_scores:
+    st.session_state.pq_scores[trait] = st.slider(trait, 1, 10, st.session_state.pq_scores[trait])
+
+# --- Radar Chart ---
+with st.expander("📊 PQ Trait Radar Chart"):
     draw_radar(st.session_state.pq_scores)
+
+# --- Spiral Growth Visual ---
+with st.expander("🌀 Spiral Growth View"):
+    draw_spiral_placeholder()
 
 # --- Diagnostic Test ---
 if not st.session_state.diagnostic_questions and not st.session_state.reinforcement_mode:
-    selected_grade = st.selectbox("Select your grade level to begin:", list(diagnostic_files.keys()))
-
     if st.button("Start Diagnostic Test"):
-        filename = diagnostic_files[selected_grade]
+        filename = diagnostic_files[student_grade]
         filepath = os.path.join(diagnostic_path, filename)
 
         try:
@@ -77,9 +104,9 @@ if not st.session_state.diagnostic_questions and not st.session_state.reinforcem
                 st.session_state.diagnostic_questions = json.load(f)
             st.session_state.diagnostic_index = 0
             st.session_state.student_answers = []
-            st.success(f"{selected_grade} Diagnostic Test Loaded. Let's begin!")
+            st.success(f"{student_grade} Diagnostic Test Loaded. Let's begin!")
         except FileNotFoundError:
-            st.error("Diagnostic file not found.")
+            st.error("Diagnostic file not found. Please check the JSON file in diagnostics/")
 
 # --- Diagnostic Flow ---
 if st.session_state.diagnostic_questions and not st.session_state.reinforcement_mode:
@@ -142,18 +169,15 @@ if st.session_state.reinforcement_mode:
 
         if st.button("Next Reinforcement"):
             topic = rq['topic']
-            correct = random.choice([True, False])  # Simulated correctness
+            correct = random.choice([True, False])
             st.session_state.reinforcement_results[topic].append(correct)
 
-            # Secret gift logic for 4+ correct in one topic
             if st.session_state.reinforcement_results[topic].count(True) == 4 and not st.session_state.secret_gift_given:
                 st.session_state.secret_gift_given = True
                 st.session_state.secret_topic = topic
-                # Spiral shift: simulate by bumping 1 PQ trait
                 st.session_state.pq_scores["Growth"] += 0.5
                 st.experimental_rerun()
 
-            # Mastery logic: 10+ answered and 80%+ correct
             total = len(st.session_state.reinforcement_results[topic])
             corrects = st.session_state.reinforcement_results[topic].count(True)
             if total >= 10 and corrects / total >= 0.8:
@@ -161,11 +185,9 @@ if st.session_state.reinforcement_mode:
 
             st.session_state.reinforcement_index += 1
             st.experimental_rerun()
-
     else:
         st.balloons()
         st.success("🌟 Reinforcement Complete! Great job committing to your growth.")
-
         if st.session_state.mastered_topics:
             st.subheader("✅ Topics Mastered:")
             for t in st.session_state.mastered_topics:
@@ -177,7 +199,7 @@ if st.session_state.reinforcement_mode:
             st.image("https://cdn-icons-png.flaticon.com/512/471/471664.png", width=150)
             st.success(f"You've mastered **{topic}** with 4 consistent correct answers!")
             st.info("📬 Teacher Notification:")
-            st.write(f"Student improved significantly in **{topic}**. Secret Gift delivered.")
+            st.write(f"Student **{student_name}** improved significantly in **{topic}**.")
             st.write("Spiral score shifted +5% upward in 'Growth'.")
         else:
             st.info("Keep going! You're building confidence and power through effort ✨")
