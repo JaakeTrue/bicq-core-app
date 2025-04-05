@@ -1,4 +1,3 @@
-
 import os
 import json
 import streamlit as st
@@ -115,7 +114,6 @@ if not st.session_state.diagnostic_questions and not st.session_state.reinforcem
 
         st.session_state.diagnostic_index = 0
         st.session_state.student_answers = []
-        st.experimental_rerun()
 
 # --- Diagnostic Flow ---
 if st.session_state.diagnostic_questions and not st.session_state.reinforcement_mode:
@@ -139,7 +137,6 @@ if st.session_state.diagnostic_questions and not st.session_state.reinforcement_
                 "correct": None
             })
             st.session_state.diagnostic_index += 1
-            st.experimental_rerun()
     else:
         st.success("🎉 Diagnostic complete!")
         df = pd.DataFrame(st.session_state.student_answers)
@@ -159,7 +156,6 @@ if st.session_state.diagnostic_questions and not st.session_state.reinforcement_
             st.session_state.reinforcement_index = 0
             st.session_state.reinforcement_results = defaultdict(list)
             st.session_state.mastered_topics = set()
-            st.experimental_rerun()
 
 # --- Reinforcement Phase ---
 if st.session_state.reinforcement_mode:
@@ -184,7 +180,6 @@ if st.session_state.reinforcement_mode:
                 st.session_state.secret_gift_given = True
                 st.session_state.secret_topic = topic
                 st.session_state.pq_scores["Growth"] += 0.5
-                st.experimental_rerun()
 
             total = len(st.session_state.reinforcement_results[topic])
             corrects = st.session_state.reinforcement_results[topic].count(True)
@@ -192,7 +187,6 @@ if st.session_state.reinforcement_mode:
                 st.session_state.mastered_topics.add(topic)
 
             st.session_state.reinforcement_index += 1
-            st.experimental_rerun()
     else:
         st.balloons()
         st.success("🌟 Reinforcement Complete!")
