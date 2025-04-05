@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from datetime import datetime
 
-# --- Diagnostic Setup ---
-diagnostic_files = {
+# --- Constants ---
+DIAGNOSTIC_FILES = {
     "Grade 1": "grade1_diagnostic.json",
     "Grade 2": "grade2_diagnostic.json",
     "Grade 3": "grade3_diagnostic.json",
@@ -20,20 +20,33 @@ diagnostic_files = {
     "Grade 8": "grade8_diagnostic.json",
     "GED": "ged_diagnostic.json"
 }
-diagnostic_path = "diagnostics"
+DIAGNOSTIC_PATH = "diagnostics"
+STUDENT_LIST = ["Select Student", "Izzy", "Jayden", "Maria", "Jake", "Masaki"]
 
-# Sample fallback question
-fallback_question = [
-    {
-        "subject": "Math",
-        "topic": "Addition",
-        "difficulty": "Easy",
-        "question": "What is 2 + 3?",
-        "answer": "5"
-    }
-]
+# --- Utility Functions ---
+def initialize_session_state():
+    if "pq_scores" not in st.session_state:
+        st.session_state.pq_scores = {
+            "Participation": 5, 
+            "Effort": 5, 
+            "Mindset": 5, 
+            "Growth": 5, 
+            "Focus": 5
+        }
+    if "diagnostic_data" not in st.session_state:
+        st.session_state.diagnostic_data = {
+            "questions": [],
+            "index": 0,
+            "answers": [],
+            "reinforcement_mode": False,
+            "reinforcement_questions": [],
+            "reinforcement_index": 0,
+            "reinforcement_results": defaultdict(list),
+            "secret_gift_given": False,
+            "mastered_topics": set(),
+            "weak_areas": []
+        }
 
-# --- Radar Chart Function ---
 def draw_radar(trait_scores, label="Today"):
     traits = list(trait_scores.keys())
     values = list(trait_scores.values()) + [trait_scores[traits[0]]]
@@ -48,7 +61,6 @@ def draw_radar(trait_scores, label="Today"):
     ax.legend(loc='upper right')
     st.pyplot(fig)
 
-# --- Spiral Chart Placeholder ---
 def draw_spiral_placeholder():
     t = np.linspace(0, 6 * np.pi, 100)
     r = 0.5 * t
@@ -59,149 +71,151 @@ def draw_spiral_placeholder():
     ax.set_title("Spiral Growth Placeholder")
     st.pyplot(fig)
 
+def load_diagnostic_questions(grade):
+    filename = DIAGNOSTIC_FILES[grade]
+    filepath = os.path.join(DIAGNOSTIC_PATH, filename)
+    
+    try:
+        if os.path.exists(filepath):
+            with open(filepath, "r", encoding="utf-8") as f:
+                return json.load(f)
+        else:
+            st.warning(f"{filename} not found. Using sample questions.")
+            return [{
+                "subject": "Math",
+                "topic": "Sample",
+                "difficulty": "Easy",
+                "question": "What is 2 + 2?",
+                "answer": "4"
+            }]
+    except Exception as e:
+        st.error(f"Error loading questions: {str(e)}")
+        return []
+
 # --- UI Setup ---
 st.set_page_config(page_title="Game Changer Diagnostic", layout="wide")
 st.title("🧠 Game Changer Diagnostic System")
 
-# --- Student Dropdown ---
+# --- Sidebar - Student Selection ---
 with st.sidebar:
     st.header("👤 Student Login")
-    student_list = ["Select Student", "Izzy", "Jayden", "Maria", "Jake", "Masaki"]
-    selected_student = st.selectbox("Choose a student:", student_list)
-    student_grade = st.selectbox("Grade:", list(diagnostic_files.keys()))
+    selected_student = st.selectbox("Choose a student:", STUDENT_LIST)
+    student_grade = st.selectbox("Grade:", list(DIAGNOSTIC_FILES.keys()))
     login_date = datetime.today().strftime("%Y-%m-%d")
     st.write(f"📅 Session: {login_date}")
 
-# --- Init State ---
-if "pq_scores" not in st.session_state:
-    st.session_state.pq_scores = {"Participation": 5, "Effort": 5, "Mindset": 5, "Growth": 5, "Focus": 5}
-if "diagnostic_questions" not in st.session_state:
-    st.session_state.diagnostic_questions = []
-    st.session_state.diagnostic_index = 0
-    st.session_state.student_answers = []
-    st.session_state.reinforcement_mode = False
-    st.session_state.reinforcement_questions = []
-    st.session_state.reinforcement_index = 0
-    st.session_state.reinforcement_results = defaultdict(list)
-    st.session_state.secret_gift_given = False
-    st.session_state.mastered_topics = set()
+# Initialize session state
+initialize_session_state()
 
-# --- PQ Sliders ---
-st.subheader("🔧 PQ Trait Self-Check")
-for trait in st.session_state.pq_scores:
-    st.session_state.pq_scores[trait] = st.slider(trait, 1, 10, st.session_state.pq_scores[trait])
+# --- Main App Flow ---
+if selected_student == "Select Student":
+    st.info("👈 Please select a student from the sidebar to begin")
+else:
+    # --- Student Dashboard Header ---
+    st.header(f"Student Dashboard: {selected_student}")
+    st.subheader(f"📊 {student_grade} Performance Metrics")
 
-# --- Radar & Spiral View ---
-with st.expander("📊 PQ Trait Radar Chart"):
-    draw_radar(st.session_state.pq_scores)
+    # --- PQ Trait Assessment ---
+    st.subheader("🔧 PQ Trait Self-Check")
+    for trait in st.session_state.pq_scores:
+        st.session_state.pq_scores[trait] = st.slider(
+            trait, 1, 10, st.session_state.pq_scores[trait]
+        )
 
-with st.expander("🌀 Spiral Growth View"):
-    draw_spiral_placeholder()
+    # --- Visualization Section ---
+    col1, col2 = st.columns(2)
+    with col1:
+        with st.expander("📊 PQ Trait Radar Chart"):
+            draw_radar(st.session_state.pq_scores)
+    with col2:
+        with st.expander("🌀 Spiral Growth View"):
+            draw_spiral_placeholder()
 
-# --- Start Diagnostic Test ---
-if not st.session_state.diagnostic_questions and not st.session_state.reinforcement_mode:
-    if st.button("Start Diagnostic Test"):
-        filename = diagnostic_files[student_grade]
-        filepath = os.path.join(diagnostic_path, filename)
+    # --- Diagnostic Test Flow ---
+    data = st.session_state.diagnostic_data
+    
+    if not data["questions"] and not data["reinforcement_mode"]:
+        if st.button("Start Diagnostic Test"):
+            data["questions"] = load_diagnostic_questions(student_grade)
+            data["index"] = 0
+            data["answers"] = []
 
-        if os.path.exists(filepath):
-            with open(filepath, "r", encoding="utf-8") as f:
-                st.session_state.diagnostic_questions = json.load(f)
-            st.success(f"{student_grade} Diagnostic Test Loaded.")
+    if data["questions"] and not data["reinforcement_mode"]:
+        if data["index"] < len(data["questions"]):
+            q = data["questions"][data["index"]]
+            st.subheader(f"Question {data['index'] + 1} of {len(data['questions'])}")
+            st.write(f"**Subject:** {q['subject']}")
+            st.write(f"**Topic:** {q['topic']} ({q['difficulty']})")
+            st.write(q['question'])
+            answer = st.text_input("Your Answer:", key=f"answer_{data['index']}")
+
+            if st.button("Next Question"):
+                data["answers"].append({
+                    "question": q['question'],
+                    "answer": answer,
+                    "subject": q['subject'],
+                    "topic": q['topic'],
+                    "correct": None
+                })
+                data["index"] += 1
         else:
-            st.warning(f"{filename} not found in `diagnostics/`. Using fallback sample question.")
-            st.session_state.diagnostic_questions = fallback_question
+            st.success("🎉 Diagnostic complete!")
+            df = pd.DataFrame(data["answers"])
+            st.dataframe(df)
 
-        st.session_state.diagnostic_index = 0
-        st.session_state.student_answers = []
+            data["weak_areas"] = df["topic"].value_counts().tail(5).index.tolist()
+            st.subheader("🧩 Recommended Reinforcement Topics")
+            for topic in data["weak_areas"]:
+                st.write(f"- {topic}")
 
-# --- Diagnostic Flow ---
-if st.session_state.diagnostic_questions and not st.session_state.reinforcement_mode:
-    index = st.session_state.diagnostic_index
-    questions = st.session_state.diagnostic_questions
+            if st.button("Start Reinforcement Phase"):
+                pool = [q for q in data["questions"] if q['topic'] in data["weak_areas"]]
+                data["reinforcement_questions"] = random.sample(pool, min(15, len(pool)))
+                data["reinforcement_mode"] = True
+                data["reinforcement_index"] = 0
+                data["reinforcement_results"] = defaultdict(list)
+                data["mastered_topics"] = set()
 
-    if index < len(questions):
-        q = questions[index]
-        st.subheader(f"Question {index + 1} of {len(questions)}")
-        st.write(f"**Subject:** {q['subject']}")
-        st.write(f"**Topic:** {q['topic']} ({q['difficulty']})")
-        st.write(q['question'])
-        answer = st.text_input("Your Answer:", key=f"answer_{index}")
+    # --- Reinforcement Phase ---
+    if data["reinforcement_mode"]:
+        if data["reinforcement_index"] < len(data["reinforcement_questions"]):
+            rq = data["reinforcement_questions"][data["reinforcement_index"]]
+            st.subheader(f"🔁 Reinforcement Question {data['reinforcement_index'] + 1} of {len(data['reinforcement_questions'])}")
+            st.write(f"**Subject:** {rq['subject']}")
+            st.write(f"**Topic:** {rq['topic']} ({rq['difficulty']})")
+            st.write(rq['question'])
+            r_answer = st.text_input("Your Answer:", key=f"reinforce_{data['reinforcement_index']}")
 
-        if st.button("Next Question"):
-            st.session_state.student_answers.append({
-                "question": q['question'],
-                "answer": answer,
-                "subject": q['subject'],
-                "topic": q['topic'],
-                "correct": None
-            })
-            st.session_state.diagnostic_index += 1
-    else:
-        st.success("🎉 Diagnostic complete!")
-        df = pd.DataFrame(st.session_state.student_answers)
-        st.dataframe(df)
+            if st.button("Next Reinforcement"):
+                topic = rq['topic']
+                correct = random.choice([True, False])
+                data["reinforcement_results"][topic].append(correct)
 
-        weak_areas = df["topic"].value_counts().tail(5).index.tolist()
-        st.session_state.weak_areas = weak_areas
+                if data["reinforcement_results"][topic].count(True) == 4 and not data["secret_gift_given"]:
+                    data["secret_gift_given"] = True
+                    st.session_state.pq_scores["Growth"] += 0.5
 
-        st.subheader("🧩 Recommended Reinforcement Topics")
-        for topic in weak_areas:
-            st.write(f"- {topic}")
+                total = len(data["reinforcement_results"][topic])
+                corrects = data["reinforcement_results"][topic].count(True)
+                if total >= 10 and corrects / total >= 0.8:
+                    data["mastered_topics"].add(topic)
 
-        if st.button("Start Reinforcement Phase"):
-            pool = [q for q in questions if q['topic'] in weak_areas]
-            st.session_state.reinforcement_questions = random.sample(pool, min(15, len(pool)))
-            st.session_state.reinforcement_mode = True
-            st.session_state.reinforcement_index = 0
-            st.session_state.reinforcement_results = defaultdict(list)
-            st.session_state.mastered_topics = set()
-
-# --- Reinforcement Phase ---
-if st.session_state.reinforcement_mode:
-    r_index = st.session_state.reinforcement_index
-    r_questions = st.session_state.reinforcement_questions
-
-    if r_index < len(r_questions):
-        rq = r_questions[r_index]
-        st.subheader(f"🔁 Reinforcement Question {r_index + 1} of {len(r_questions)}")
-        st.write(f"**Subject:** {rq['subject']}")
-        st.write(f"**Topic:** {rq['topic']} ({rq['difficulty']})")
-        st.write(rq['question'])
-
-        r_answer = st.text_input("Your Answer:", key=f"reinforce_{r_index}")
-
-        if st.button("Next Reinforcement"):
-            topic = rq['topic']
-            correct = random.choice([True, False])
-            st.session_state.reinforcement_results[topic].append(correct)
-
-            if st.session_state.reinforcement_results[topic].count(True) == 4 and not st.session_state.secret_gift_given:
-                st.session_state.secret_gift_given = True
-                st.session_state.secret_topic = topic
-                st.session_state.pq_scores["Growth"] += 0.5
-
-            total = len(st.session_state.reinforcement_results[topic])
-            corrects = st.session_state.reinforcement_results[topic].count(True)
-            if total >= 10 and corrects / total >= 0.8:
-                st.session_state.mastered_topics.add(topic)
-
-            st.session_state.reinforcement_index += 1
-    else:
-        st.balloons()
-        st.success("🌟 Reinforcement Complete!")
-        if st.session_state.mastered_topics:
-            st.subheader("✅ Topics Mastered:")
-            for t in st.session_state.mastered_topics:
-                st.write(f"- {t}")
-
-        if st.session_state.secret_gift_given:
-            topic = st.session_state.secret_topic
-            st.markdown("## 🎁 Secret Gift Unlocked!")
-            st.image("https://cdn-icons-png.flaticon.com/512/471/471664.png", width=150)
-            st.success(f"You've mastered **{topic}**!")
-            st.info("📬 Teacher Notification:")
-            st.write(f"Student **{selected_student}** improved significantly in **{topic}**.")
-            st.write("Spiral score shifted +5% upward in 'Growth'.")
+                data["reinforcement_index"] += 1
         else:
-            st.info("Keep going! You're building confidence and power through effort ✨")
+            st.balloons()
+            st.success("🌟 Reinforcement Complete!")
+            
+            if data["mastered_topics"]:
+                st.subheader("✅ Topics Mastered:")
+                for t in data["mastered_topics"]:
+                    st.write(f"- {t}")
+
+            if data["secret_gift_given"]:
+                st.markdown("## 🎁 Secret Gift Unlocked!")
+                st.image("https://cdn-icons-png.flaticon.com/512/471/471664.png", width=150)
+                st.success("You've shown significant improvement!")
+                st.info("📬 Teacher Notification:")
+                st.write(f"Student {selected_student} has made excellent progress.")
+                st.write("Spiral score shifted +5% upward in 'Growth'.")
+            else:
+                st.info("Keep going! You're building confidence and power through effort ✨")
