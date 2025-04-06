@@ -19,25 +19,25 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     if st.button("🌱 Spiral Growth Graph"):
-        st.experimental_set_query_params(view="spiral")
+        st.query_params(view="spiral")
     if st.button("📊 Penta Quotient (PQ)"):
-        st.experimental_set_query_params(view="pq")
+        st.query_params(view="pq")
     if st.button("💥 Game Changer"):
-        st.experimental_set_query_params(view="game")
+        st.query_params(view="game")
 
 with col2:
     if st.button("📈 RMS Quotient (RMQ)"):
-        st.experimental_set_query_params(view="rmq")
+        st.query_params(view="rmq")
     if st.button("💡 BIGQ Score Summary"):
-        st.experimental_set_query_params(view="bigq")
+        st.query_params(view="bigq")
     if st.button("🎮 NSM Worksheet + Mini-Game"):
-        st.experimental_set_query_params(view="nsm")
+        st.query_params(view="nsm")
 
 with col3:
     if st.button("📬 Communication Board"):
-        st.experimental_set_query_params(view="comm")
+        st.query_params(view="comm")
     if st.button("🧠 AI Teacher Tools"):
-        st.experimental_set_query_params(view="ai")
+        st.query_params(view="ai")
 
 # Routing by Query Parameter
 view = st.experimental_get_query_params().get("view", [None])[0]
