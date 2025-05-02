@@ -1,0 +1,41 @@
+from fastapi import FastAPI, HTTPException from fastapi.middleware.cors import CORSMiddleware from pydantic import BaseModel, Field from typing import List, Dict, Optional, Tuple from uuid import uuid4, UUID from datetime import datetime, timedelta import random
+""" Game Changer API – enhanced ANSM & special-care logic Features:
+• Random intervals (2–36 h)
+• Echo flags for hidden weaknesses
+• Cognitive refresh prompts
+• Hints on 2nd/5th wrong
+• Mastery after 3 correct
+• Special-care: serve alternate questions of same difficulty after 3 wrong """
+app = FastAPI( title="Game Changer – Math API (Enhanced)", description="Adaptive math practice with ANSM, EDSM, VBMS, and special-care logic." ) app.add_middleware( CORSMiddleware, allow_origins=[""], allow_methods=[""], allow_headers=["*"], )
+-----------------------------
+Data models
+-----------------------------
+class Choice(BaseModel): label: str text: str
+class Question(BaseModel): id: str = Field(default_factory=lambda: str(uuid4())) grade: int topic: str difficulty: int = 1 # 1=easy, 2=medium, 3=hard text: str choices: Optional[List[Choice]] = None answer: str hint: Optional[str] = None
+class SessionStart(BaseModel): student_id: str grade: int subject: str = "Math"
+class AnswerSubmission(BaseModel): session_id: UUID question_id: str answer: str
+class ProgressReport(BaseModel): session_id: UUID total_answered: int correct: int accuracy: float next_review: Optional[datetime]
+-----------------------------
+In-memory stores
+-----------------------------
+QUESTION_BANK: Dict[int, List[Question]] = {} SESSIONS: Dict[UUID, Dict] = {} MEMORY: Dict[Tuple[str, str], Dict] = {} # (student_id, question_id) -> {stability, due} ATTEMPTS: Dict[Tuple[str, str], int] = {} # (student_id, question_id) -> wrong count
+-----------------------------
+Content pools
+-----------------------------
+JOKES = [ "Why was the equal sign so humble? Because it knew it wasn't less than or greater than anyone else!", "Why do plants hate math? It gives them square roots!" ] SCI_QUESTIONS = [ "What planet is known as the Red Planet?", "What gas do plants breathe in that's essential for photosynthesis?" ]
+-----------------------------
+Helpers
+-----------------------------
+def next_interval() -> timedelta: hours = random.uniform(2, 36) return timedelta(hours=hours)
+-----------------------------
+Endpoints
+-----------------------------
+@app.get("/health") async def health_check(): return {"status": "ok", "timestamp": datetime.utcnow()}
+@app.post("/session/start") async def start_session(payload: SessionStart): session_id = uuid4() SESSIONS[session_id] = { "student_id": payload.student_id, "grade": payload.grade, "history": [], # List of (qid, correct, ts) "correct_streak": 0, } return {"session_id": session_id}
+@app.get("/question/next") async def next_question(session_id: UUID): session = SESSIONS.get(session_id) if not session: raise HTTPException(404, "Session not found") sid, grade = session["student_id"], session["grade"] bank = QUESTION_BANK.get(grade, []) if not bank: raise HTTPException(404, "Question bank not loaded for this grade")
+now = datetime.utcnow() # 1) Due reviews due = [q for q in bank if (sid, q.id) in MEMORY and MEMORY[(sid, q.id)]["due"] <= now] if due: return due[0] # 2) Unseen seen = {qid for qid, *_ in session["history"]} unseen = [q for q in bank if q.id not in seen] if unseen: return unseen[0] # 3) Fallback return bank[0] 
+@app.post("/question/submit") async def submit_answer(payload: AnswerSubmission): session = SESSIONS.get(payload.session_id) if not session: raise HTTPException(404, "Session not found") sid, grade = session["student_id"], session["grade"] bank = QUESTION_BANK.get(grade, []) qmap = {q.id: q for q in bank} q = qmap.get(payload.question_id) if not q: raise HTTPException(404, "Question not found")
+correct = payload.answer.strip().lower() == q.answer.strip().lower() ts = datetime.utcnow() session["history"].append((q.id, correct, ts)) # Track attempts key = (sid, q.id) if not correct: ATTEMPTS[key] = ATTEMPTS.get(key, 0) + 1 else: ATTEMPTS[key] = 0 # Determine special care special = ATTEMPTS.get(key, 0) >= 3 # Update memory stability rec = MEMORY.get(key, {"stability": 0}) rec["stability"] = rec["stability"] + 1 if correct else max(rec["stability"] - 1, 0) rec["due"] = ts + next_interval() MEMORY[key] = rec # Update mastery streak if correct: session["correct_streak"] += 1 else: session["correct_streak"] = 0 mastery = session["correct_streak"] >= 3 # Build response n = len(session["history"]) total = n correct_count = sum(1 for _, c, _ in session["history"] if c) irate = (total - correct_count) / total if total else 0 resp = { "correct": correct, "next_review_due": rec["due"].isoformat(), "stability": rec["stability"] } if mastery: resp["mastered"] = True if rec["stability"] <= 1: resp["echo"] = True if not correct and n in (2, 5): resp["hint"] = q.hint or "Review your steps." if total >= 5 and irate >= 0.3: if random.choice([True, False]): resp["refresh_type"] = "joke" resp["refresh"] = random.choice(JOKES) else: resp["refresh_type"] = "science" resp["refresh"] = random.choice(SCI_QUESTIONS) # Special-care: pick alternate question of same difficulty if special: same_diff = [x for x in bank if x.difficulty == q.difficulty and x.id != q.id] if same_diff: alt = random.choice(same_diff) resp["special_care"] = True resp["special_question"] = alt.dict() # Progress every 7 answers if n % 7 == 0: resp["progress"] = {"total_answered": total, "correct": correct_count, "accuracy": correct_count/total} return resp 
+@app.get("/session/progress", response_model=ProgressReport) async def session_progress(session_id: UUID): s = SESSIONS.get(session_id) if not s: raise HTTPException(404, "Session not found") total = len(s["history"]) cc = sum(1 for _, c, _ in s["history"] if c) acc = cc/total if total else 0 sid = s["student_id"] due_list = [r["due"] for (stu, _), r in MEMORY.items() if stu == sid] nd = min(due_list) if due_list else None return ProgressReport(session_id=session_id, total_answered=total, correct=cc, accuracy=acc, next_review=nd)
+@app.post("/admin/question_bank/upload") async def upload_question_bank(payload: Dict): grade = payload.get("grade") questions = payload.get("questions", []) QUESTION_BANK[grade] = [Question(**q) for q in questions] return {"grade": grade, "questions_loaded": len(QUESTION_BANK[grade])}
+@app.on_event("startup") async def load_sample(): QUESTION_BANK[3] = [ Question(grade=3, topic="Addition", difficulty=1, text="5 + 7 = ?", answer="12", hint="Start at 5 and add 7."), Question(grade=3, topic="Subtraction", difficulty=1, text="10 - 4 = ?", answer="6", hint="Remove 4 from 10."), Question(grade=3, topic="Multiplication", difficulty=2, text="3 × 4 = ?", answer="12", hint="Think of groups of 3."), Question(grade=3, topic="Division", difficulty=2, text="12 ÷ 3 = ?", answer="4", hint="How many 3s in 12?"), Question(grade=3, topic="Fractions", difficulty=3, text="What is 1/2 + 1/3?", answer="5/6", hint="Find common denominator."), ]
